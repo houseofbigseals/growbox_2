@@ -12,10 +12,12 @@ void do_reset_epoch();
 void do_show_time();
 void do_send_info();
 void do_show_temp();
+void do_show_outputs();
+void do_show_all();
 void print2digits(int number);
 void check_shedule();
 
-const float grow_version = 0.02; 
+const float grow_version = 0.03; 
 
 const byte ROWS = 4; //four rows
 const byte COLS = 4; //four columns
@@ -25,6 +27,8 @@ const unsigned long interval = 100; //timer interval in ms
 //flags for main loop
 boolean show_time = false;
 boolean show_temp = false;
+boolean show_outputs = false;
+boolean show_all = false;
 boolean led = false;
 boolean fans = false;
 boolean cooler = false;
@@ -41,7 +45,7 @@ tmElements_t tm;
 byte *day_modes;
 tmElements_t start_time;
 
-LiquidCrystal_I2C lcd(0x3F,16,2);   // Задаем адрес и размерность дисплея
+LiquidCrystal_I2C lcd(0x27,16,2);   // Задаем адрес и размерность дисплея 0x27 or 0x3F
 DHT dht(2, DHT11);
 
 //define the cymbols on the buttons of the keypads
@@ -67,7 +71,9 @@ const char SetOffAll[5] = "B100";
 const char GetInfo[5] = "C001";
 const char ShowTime[5] = "C002";
 const char ShowTemp[5] = "C003";
-const char Reset[5] = "D001";
+const char ShowOutputs[5] = "C004";
+const char ShowAll[5] = "C005";
+const char ResetCycle[5] = "D001";
 // variable for current command
 String command;
 
@@ -123,6 +129,13 @@ void setup()
   digitalWrite(relay_pin4, HIGH);
 
   command = String();
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Hello!"); 
+    lcd.setCursor(0, 1);
+    lcd.print("Press any key"); 
+  
   Serial.println("End of init");
 }
   
@@ -134,48 +147,71 @@ void loop()
   {
     previousMillis = currentMillis;
     // we have to check flags
-    if(show_time == true)
+    if(show_time)
     {
       do_show_time();
     }
-    if(show_temp == true)
+    if(show_temp)
     {
       do_show_temp();
     }
-    if(!manual_mode)
+    if(show_outputs)
     {
-      if(led == true)
-      {
-        digitalWrite(relay_pin3, LOW);
-      }
-      else
-      {
-        digitalWrite(relay_pin3, HIGH);
-      }
-      if(pump == true)
-      {
-        digitalWrite(relay_pin1, LOW);
-      }
-      else
-      {
-        digitalWrite(relay_pin1, HIGH);
-      }
-      if(fans == true)
-      {
-        digitalWrite(relay_pin4, LOW);
-      }
-      else
-      {
-        digitalWrite(relay_pin4, HIGH);
-      }
-      if(cooler == true)
-      {
-        digitalWrite(relay_pin2, LOW);
-      }
-      else
-      {
-        digitalWrite(relay_pin2, HIGH);
-      }
+      do_show_outputs();
+    }
+    if(show_all)
+    {
+      do_show_all();
+    }
+    //print mode on LCD
+    if(!show_time && !show_temp && !show_outputs && !show_all && manual_mode)
+    {
+      //lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("MANUAL MODE"); 
+      lcd.setCursor(0, 1);
+      lcd.print("0 to auto mode"); 
+    }
+    if(!show_time && !show_temp && !show_outputs && !show_all && !manual_mode)
+    {
+      //lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("AUTO MODE"); 
+      lcd.setCursor(0, 1);
+      lcd.print("# to manual mode"); 
+    }
+    
+    if(led == true)
+    {
+      digitalWrite(relay_pin3, LOW);
+    }
+    else
+    {
+      digitalWrite(relay_pin3, HIGH);
+    }
+    if(pump == true)
+    {
+      digitalWrite(relay_pin1, LOW);
+    }
+    else
+    {
+      digitalWrite(relay_pin1, HIGH);
+    }
+    if(fans == true)
+    {
+      digitalWrite(relay_pin4, LOW);
+    }
+    else
+    {
+      digitalWrite(relay_pin4, HIGH);
+    }
+    if(cooler == true)
+    {
+      digitalWrite(relay_pin2, LOW);
+    }
+    else
+    {
+      digitalWrite(relay_pin2, HIGH);
     }
     check_commands();
     check_shedule();
@@ -189,11 +225,8 @@ void check_commands()
   {
     show_time = false;
     show_temp = false;
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("# - manual mode"); 
-    lcd.setCursor(0, 1);
-    lcd.print("0 - auto mode"); 
+    show_outputs = false;
+    show_all = false;
     
     Serial.println(customKey);
     if (customKey == '0')
@@ -209,9 +242,9 @@ void check_commands()
     {
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("Command mode!"); 
+      lcd.print("Manual mode!"); 
       lcd.setCursor(0, 1);
-      lcd.print("* to cancel"); 
+      lcd.print("Enter command"); 
       
       //Serial.println("we start to read the command!");
       //start read new command
@@ -228,6 +261,9 @@ void check_commands()
             //Serial.println("we got end of command");
             //Serial.print("now we have : ");
             //Serial.println(command);
+            
+            //clear LCD to show mode string then
+            //lcd.clear();
             break;
           }
           else
@@ -247,6 +283,7 @@ void check_commands()
           //digitalWrite(relay_pin1, LOW);
           pump = true;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(SetOn2))
@@ -255,6 +292,7 @@ void check_commands()
           //digitalWrite(relay_pin2, LOW);
           cooler = true;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(SetOn3))
@@ -263,6 +301,7 @@ void check_commands()
           //digitalWrite(relay_pin3, LOW);
           led = true;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(SetOn4))
@@ -271,6 +310,7 @@ void check_commands()
           //digitalWrite(relay_pin4, LOW);
           fans = true;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(SetOff1))
@@ -279,6 +319,7 @@ void check_commands()
           //digitalWrite(relay_pin1, HIGH);
           cooler = false;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(SetOff2))
@@ -287,6 +328,7 @@ void check_commands()
           //digitalWrite(relay_pin2, HIGH);
           cooler = false;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(SetOff3))
@@ -295,6 +337,7 @@ void check_commands()
           //digitalWrite(relay_pin3, HIGH);
           led = false;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(SetOff4))
@@ -303,6 +346,7 @@ void check_commands()
           fans = false;
           manual_mode = true;
           //digitalWrite(relay_pin4, HIGH);
+          lcd.clear();
           return;
         }
         if(command == String(SetOffAll))
@@ -314,6 +358,7 @@ void check_commands()
           cooler = false;
           pump = false;
           manual_mode = true;
+          lcd.clear();
           return;
         }
         if(command == String(ShowTemp))
@@ -321,8 +366,11 @@ void check_commands()
           //Serial.println("ShowTemp command was received!");
           show_time = false;
           show_temp = true;
+          show_outputs = false;
+          show_all = false;
           lcd.clear();
           do_show_temp();
+          lcd.clear();
           return;
         }
         if(command == String(ShowTime))
@@ -330,6 +378,8 @@ void check_commands()
           //Serial.println("ShowTime command was received!");
           show_time = true;
           show_temp = false;
+          show_outputs = false;
+          show_all = false;
           lcd.clear();
           do_show_time();
           return;
@@ -338,26 +388,52 @@ void check_commands()
         {
           //Serial.println("GetInfo command was received!");
           do_send_info();
+          lcd.clear();
           return;
         }
-        if(command == String(Reset))
+        if(command == String(ShowOutputs))
+        {
+          //Serial.println("ShowOutputs command was received!");
+          show_outputs = true;
+          show_time = false;
+          show_temp = false;
+          show_all = false;
+          do_show_outputs();
+          lcd.clear();
+          return;
+        }
+        if(command == String(ShowAll))
+        {
+          //Serial.println("ShowAll command was received!");
+          show_all = true;
+          show_outputs = false;
+          show_time = false;
+          show_temp = false;
+          do_show_all();
+          lcd.clear();
+          return;
+        }
+        if(command == String(ResetCycle))
         {
           //Serial.println("Reset command was received!");
           do_reset_epoch();
+          lcd.clear();
           return;
         }
         else
         {
-          //Serial.println("That is not a command, i dont know what to do");
+          Serial.println("That is not a command, i dont know what to do");
+          //lcd.clear();
+          //lcd.setCursor(0, 0);
+          //lcd.print("Not a command"); 
+          //lcd.setCursor(0, 1);
+          //lcd.print("Press any key"); 
           lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print("Not a command"); 
-          lcd.setCursor(0, 1);
-          lcd.print("Press any key"); 
           return;
         }
         
     }
+    lcd.clear();
   }
 }
 void show_on_LCD(String S)
@@ -375,6 +451,256 @@ void show_on_LCD(String S)
   lcd.print(charBuf);     // Выводим текст
   //Serial.println("End of showing on LCD!");
 }
+
+void do_show_all()
+{
+  //Serial.print("ShowAll");
+  
+  //DrawTime and Date
+  if (RTC.read(tm)) 
+  {
+    printLCD2digits(tm.Hour, 0, 0);
+    lcd.setCursor(2, 0);
+    lcd.print(":");
+    printLCD2digits(tm.Minute, 3, 0);
+    lcd.setCursor(5, 0);
+    lcd.print(" ");
+
+    printLCD2digits(tm.Day, 0, 1);
+    lcd.setCursor(2, 1);
+    lcd.print(".");
+    printLCD2digits(tm.Month, 3, 1);
+    lcd.setCursor(5, 1);
+    lcd.print(" ");
+  } 
+  else 
+  {
+    //lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("RTC");
+    lcd.setCursor(0, 1);
+    lcd.print("Error");
+
+    lcd.setCursor(5, 0);
+    lcd.print(" ");
+    lcd.setCursor(5, 1);
+    lcd.print(" ");
+    
+    if (RTC.chipPresent()) 
+    {
+      Serial.println("The DS1307 is stopped.  Please run the SetTime");
+      //Serial.println("example to initialize the time and begin running.");
+      //Serial.println();
+    } 
+    else 
+    {
+      Serial.println("DS1307 read error!  Please check the circuitry.");
+      //Serial.println();
+    }
+  }
+
+  // Show humidity and temperature, received from DHT11, on LCD
+  
+  int h = int(dht.readHumidity());
+  int t = int(dht.readTemperature());
+  
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(h) || isnan(t)) 
+  {
+    lcd.setCursor(6, 0); 
+    lcd.print("DHT");
+    lcd.setCursor(6, 1); 
+    lcd.print("ERR");
+    lcd.setCursor(10, 0);
+    lcd.print(" ");
+    lcd.setCursor(10, 1);
+    lcd.print(" ");
+    
+  }
+  else
+  {
+  // Выводим показания влажности и температуры
+  //lcd.clear();
+  lcd.setCursor(6, 0);
+  lcd.print("H:");
+  lcd.setCursor(6, 1);
+  lcd.print("T:");
+  
+  lcd.setCursor(8, 0); 
+  lcd.print(h, 1);
+  lcd.setCursor(8, 1);
+  lcd.print(t, 1);
+  
+  lcd.setCursor(10, 0);
+  lcd.print(" ");
+  lcd.setCursor(10, 1);
+  lcd.print(" ");
+  }
+
+  //show state of perifery
+  RTC.read(tm);
+  int current_day = tm.Day - start_time.Day;
+  int mode = int(day_modes[current_day]);
+  /*
+  boolean led = false;
+  boolean fans = false;
+  boolean cooler = false;
+  boolean pump = false;
+  */
+  lcd.setCursor(11, 0);
+  lcd.print(mode);
+  
+  if(pump)
+  {
+    lcd.setCursor(12, 0);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(12, 0);
+    lcd.print("0");
+  }
+  
+  if(cooler)
+  {
+    lcd.setCursor(13, 0);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(13, 0);
+    lcd.print("0");
+  }
+
+  if(led)
+  {
+    lcd.setCursor(14, 0);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(14, 0);
+    lcd.print("0");
+  }
+
+  if(fans)
+  {
+    lcd.setCursor(15, 0);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(15, 0);
+    lcd.print("0");
+  }
+
+  // Show current mode auto or manual
+  lcd.setCursor(11, 1);
+  if(manual_mode)
+  {
+    lcd.print("MAN");
+  }
+  else
+  {
+    lcd.print("AUTO");
+  }
+  
+}
+
+void do_show_outputs()
+{
+
+  //Serial.print("ShowOutputs");
+  /*
+  ShowOutputsState of perifery");
+  Serial.print("Pump ");
+  Serial.println(pump);
+  Serial.print("Fans ");
+  Serial.println(fans);
+  Serial.print("Led ");
+  Serial.println(led);
+  Serial.print("Cooler ");
+  Serial.println(cooler);
+  */
+  lcd.setCursor(0, 0);
+  lcd.print("mode");
+  //lcd.setCursor(3, 0);
+  //lcd.print("|");
+  lcd.setCursor(5, 0);
+  lcd.print("1");
+  lcd.setCursor(6, 0);
+  //lcd.print("|");
+  lcd.setCursor(8, 0);
+  lcd.print("2");
+  //lcd.setCursor(9, 0);
+  //lcd.print("|");
+  lcd.setCursor(11, 0);
+  lcd.print("3");
+  //lcd.setCursor(12, 0);
+  //lcd.print("|");
+  lcd.setCursor(14, 0);
+  lcd.print("4");
+  //lcd.setCursor(6, 0);
+  //lcd.print("|");
+  
+  RTC.read(tm);
+  int current_day = tm.Day - start_time.Day;
+  int mode = int(day_modes[current_day]);
+  /*
+  boolean led = false;
+  boolean fans = false;
+  boolean cooler = false;
+  boolean pump = false;
+  */
+  lcd.setCursor(0, 1);
+  lcd.print(mode);
+  
+  if(pump)
+  {
+    lcd.setCursor(5, 1);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(5, 1);
+    lcd.print("0");
+  }
+  
+  if(cooler)
+  {
+    lcd.setCursor(8, 1);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(8, 1);
+    lcd.print("0");
+  }
+
+  if(led)
+  {
+    lcd.setCursor(11, 1);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(11, 1);
+    lcd.print("0");
+  }
+
+  if(fans)
+  {
+    lcd.setCursor(14, 1);
+    lcd.print("1");
+  }
+  else
+  {
+    lcd.setCursor(14, 1);
+    lcd.print("0");
+  }
+  //Serial.print("ShowOutputs done");
+}
+
 void do_reset_epoch()
 {
   //set current time as start time
@@ -383,7 +709,7 @@ void do_reset_epoch()
   {
 
     lcd.setCursor(2, 0);
-    lcd.print("Reboot!");
+    lcd.print("Reboot cycle!");
     EEPROM.put(0, hardcoded_sign);
     EEPROM.put(1, tm);
     //Serial.println("We just have rebooted our system");
@@ -553,7 +879,7 @@ void do_send_info()
       }
       else
       {
-        Serial.println("Current mode is auto");
+        Serial.println("Current mode is auto_mode");
       }
       Serial.println(day_modes[current_day]);
       Serial.println("State of perifery");
@@ -565,7 +891,7 @@ void do_send_info()
       Serial.println(led);
       Serial.print("Cooler ");
       Serial.println(cooler);
-/*      Serial.println("State of sensors");
+      Serial.println("State of sensors");
       Serial.println("DHT11");
       float h = dht.readHumidity();
       float t = dht.readTemperature();
@@ -579,7 +905,7 @@ void do_send_info()
         Serial.println(h);
         Serial.print("Temperature is ");
         Serial.println(t);
-      }*/
+      }
 /*
       Serial.println("List of keyboard commands :");
       Serial.println("Set On Pump = A001");
@@ -619,21 +945,21 @@ void do_show_temp()
   lcd.setCursor(11, 0); 
   lcd.print(h, 1);
   lcd.setCursor(0, 1);              // Устанавливаем курсор в начало 2 строки
-  lcd.print("Temp     =    ");    // Выводим текст, \1 - значок градуса
+  lcd.print("Temp     =    ");    // Выводим текст
   lcd.setCursor(11, 1);             
   lcd.print(t,1);  
-  //delay(10);
 }
 
 void check_shedule()
 {
-  if(manual_mode == true)
+  if(manual_mode)
   {
     return;
   }
-  else{
-  RTC.read(tm);
-  int current_day = tm.Day - start_time.Day;
+  else
+  {
+    RTC.read(tm);
+    int current_day = tm.Day - start_time.Day;
   switch(day_modes[current_day])
   {
       // 0 is stable mode with nothing works
