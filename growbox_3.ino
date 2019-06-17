@@ -339,7 +339,7 @@ void check_commands()
         {
           //Serial.println("SetOff1 command was received!");
           //digitalWrite(relay_pin1, HIGH);
-          cooler = false;
+          pump = false;
           manual_mode = true;
           lcd.clear();
           return;
